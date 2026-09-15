@@ -53,7 +53,7 @@ function loadGame(randFn, storage) {
     "stamina","danger","dangerStat",
     "mWood","mFood","mHerb","iTorch","iRation","iTrap",
     "craftOverlay","closeCraft","craftTorch","craftRation","craftTrap",
-    "eventOverlay","eventTitle","eventDesc","choice0","choice1","choice2","choice3",
+    "eventOverlay","eventTitle","eventDesc","choice0","choice1","choice2","choice3","choice4",
     "overOverlay","overTitle","overDesc","overDays","overEval","overBest",
     "newRecordBadge","restartBtn","recordBtn","recordOverlay","recordDays","recordMeta","closeRecord",
     "merchantOverlay","closeMerchant","buyTorch","buyRation","buyTrap","buyTonic","buyCharm",
@@ -163,16 +163,18 @@ console.log("场景一：体力归零触发「体力耗尽」结局并写入纪�
 console.log("场景二：危险顶格触发「危险爆发」结局");
 {
   const storage = makeStorage();
-  // 事件固定暴雨；每天的探索固定带回「食物 + 草药」两种（4 次 rng/天：数量、选材、选材、抽事件）
-  let call = 0;
+  // 事件固定暴雨：抽事件 rng 恒为 0.001（首晚直接命中，之后 8 次重抽都撞上
+  // 「最近两晚」冷却，游戏兜底仍返回暴雨）。
+  // 探索的 3 次 rng（数量、选材、选材）只在点击探索按钮后紧接着发生：
+  // 0.6 带 2 种、0.5 选食物、0.7 从剩余[木头,草药]中选草药 → 固定食物+草药。
+  let exploreLeft = 0;
+  const exploreVals = [0.6, 0.5, 0.7];
   const g = loadGame(() => {
-    call++;
-    const phase = call % 4;
-    if (phase === 0) return 0.001; // 抽事件 → 暴雨
-    if (phase === 1) return 0.6;   // 探索收获 2 种
-    if (phase === 2) return 0.5;   // 第一种选到食物
-    return 0.7;                    // 第二种从木头/草药中选到草药
+    if (exploreLeft > 0) return exploreVals[3 - exploreLeft--];
+    return 0.001;
   }, storage);
+  const rawClick = g.click.bind(g);
+  g.click = (el) => { if (el === g.actionBtns[0]) exploreLeft = 3; rawClick(el); };
   // 第 2/4/6/8/10 天雨夜啃干粮（体力+1），其余 10 天硬扛（体力-1、危险+1）：
   // 第 15 天恰好第 10 次硬扛，危险顶格而体力还剩 1。
   const rationDays = new Set([2, 4, 6, 8, 10]);

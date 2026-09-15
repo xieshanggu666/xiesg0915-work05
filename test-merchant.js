@@ -39,7 +39,7 @@ function loadGame(randFn) {
     "stamina","danger","dangerStat",
     "mWood","mFood","mHerb","iTorch","iRation","iTrap",
     "craftOverlay","closeCraft","craftTorch","craftRation","craftTrap",
-    "eventOverlay","eventTitle","eventDesc","choice0","choice1","choice2","choice3",
+    "eventOverlay","eventTitle","eventDesc","choice0","choice1","choice2","choice3","choice4",
     "overOverlay","overTitle","overDesc","overDays","overEval","overBest",
     "newRecordBadge","restartBtn","recordBtn","recordOverlay","recordDays","recordMeta","closeRecord",
     "merchantOverlay","closeMerchant","buyTorch","buyRation","buyTrap","buyTonic","buyCharm",
@@ -110,13 +110,14 @@ const stats = (g) => ({
   stamina: Number(g.byId.stamina.textContent),
   danger: Number(g.byId.danger.textContent),
 });
-// rng 固定 0.99：事件必为「路过的旅人」，选第 4 项「婉言谢绝」不影响任何数值
+// rng 固定 VISIT_RNG：8 件事件中索引 2 为「路过的旅人」，选第 4 项「婉言谢绝」不影响任何数值
+const VISIT_RNG = (2 + 0.5) / 8;
 const VISIT_CHOICE = 3;
 
 // === 商人每 3 天来一次：第 1、2 天不来，第 3 天深夜事件后到访 ===
 console.log("场景一：第 3 天深夜商人才到访，来时锁定背景");
 {
-  const g = loadGame(() => 0.99);
+  const g = loadGame(() => VISIT_RNG);
   endDayAndChoose(g, VISIT_CHOICE); // 第 1 天
   check("第 1 天商人没来", !g.byId.merchantOverlay.classList.contains("show"));
   endDayAndChoose(g, VISIT_CHOICE); // 第 2 天
@@ -139,7 +140,7 @@ console.log("场景一：第 3 天深夜商人才到访，来时锁定背景");
 // === 第 3 天行情：火把 木1草1；材料换制品，可连续成交，材料花光后置灰 ===
 console.log("场景二：按浮动价用材料换火把，成交写入当天日志");
 {
-  const g = loadGame(() => 0.99);
+  const g = loadGame(() => VISIT_RNG);
   for (let i = 0; i < 2; i++) endDayAndChoose(g, VISIT_CHOICE);
   endDayAndChoose(g, VISIT_CHOICE); // 第 3 天，商人到访
   check("火把行情为 🪵×1 🌿×1",
@@ -168,7 +169,18 @@ console.log("场景二：按浮动价用材料换火把，成交写入当天日�
 // === 稀有物资：秘药体力 +3，每次到访限购一件；材料不足时标红置灰 ===
 console.log("场景三：稀有秘药限购一件，材料不足时置灰标红");
 {
-  const g = loadGame(() => 0.99); // 探索固定带回 草药+食物
+  // 事件 rng 恒为旅人（索引 2）：首晚直接命中，之后因「最近两晚」被重抽，
+  // 8 次重抽全部撞冷却后游戏兜底仍返回旅人——所以每一晚都稳定是旅人。
+  // 探索的 3 次 rng（数量、选材、选材）只在点击探索按钮后紧接着发生：
+  // 0.99 带 2 种、0.5 选食物（索引 1）、0.99 从[木头,草药]选草药
+  let exploreLeft = 0;
+  const exploreVals = [0.99, 0.5, 0.99];
+  const g = loadGame(() => {
+    if (exploreLeft > 0) return exploreVals[3 - exploreLeft--];
+    return VISIT_RNG;
+  });
+  const rawClick = g.click.bind(g);
+  g.click = (el) => { if (el === g.actionBtns[0]) exploreLeft = 3; rawClick(el); };
   // 第 3 天：先探索一次（草药+1、食物+1），再结束当天引来商人
   for (let i = 0; i < 2; i++) endDayAndChoose(g, VISIT_CHOICE);
   g.click(g.actionBtns[0]); // 探索：草药 2->3、食物 2->3
@@ -200,7 +212,7 @@ console.log("场景三：稀有秘药限购一件，材料不足时置灰标红"
 // === 护身符：危险 -2 立即生效（钳制不低于 0），同样限购 ===
 console.log("场景四：稀有护身符危险 -2 并限购");
 {
-  const g = loadGame(() => 0.99);
+  const g = loadGame(() => VISIT_RNG);
   for (let i = 0; i < 2; i++) endDayAndChoose(g, VISIT_CHOICE);
   endDayAndChoose(g, VISIT_CHOICE); // 第 3 天
   g.click(g.byId.buyCharm); // 木2草2，初始材料刚好够
@@ -215,7 +227,7 @@ console.log("场景四：稀有护身符危险 -2 并限购");
 // === Esc 送走商人，之后行动恢复正常 ===
 console.log("场景五：Esc 送客与焦点循环");
 {
-  const g = loadGame(() => 0.99);
+  const g = loadGame(() => VISIT_RNG);
   for (let i = 0; i < 2; i++) endDayAndChoose(g, VISIT_CHOICE);
   g.byId.endDayBtn.focus();
   endDayAndChoose(g, VISIT_CHOICE); // 第 3 天
@@ -230,7 +242,7 @@ console.log("场景五：Esc 送客与焦点循环");
 // === 行情浮动：同一货物不同到访日价格不同（第 3 天 木1 → 第 6 天 木2）===
 console.log("场景六：行情随到访日浮动");
 {
-  const g = loadGame(() => 0.99);
+  const g = loadGame(() => VISIT_RNG);
   for (let i = 0; i < 2; i++) endDayAndChoose(g, VISIT_CHOICE);
   endDayAndChoose(g, VISIT_CHOICE); // 第 3 天
   const day3Torch = g.byId.costBuyTorch.innerHTML;

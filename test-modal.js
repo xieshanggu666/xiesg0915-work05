@@ -39,7 +39,7 @@ const ids = [
   "stamina","danger","dangerStat",
   "mWood","mFood","mHerb","iTorch","iRation","iTrap",
   "craftOverlay","closeCraft","craftTorch","craftRation","craftTrap",
-  "eventOverlay","eventTitle","eventDesc","choice0","choice1","choice2","choice3",
+  "eventOverlay","eventTitle","eventDesc","choice0","choice1","choice2","choice3","choice4",
   "overOverlay","overTitle","overDesc","overDays","overEval","overBest",
   "newRecordBadge","restartBtn","recordBtn","recordOverlay","recordDays","recordMeta","closeRecord",
     "merchantOverlay","closeMerchant","buyTorch","buyRation","buyTrap","buyTonic","buyCharm",
@@ -148,10 +148,12 @@ check("事件期间结束当日按钮无效（事件框仍开）", eventOverlay.
 key("Escape");
 check("Esc 不能关闭事件弹窗（必须选择）", eventOverlay.classList.contains("show"));
 
-key("Tab"); // 可用选项只有三、四，Tab 在两者间循环
+key("Tab"); // 可用选项为三、四、五（初始木头够，第五项可点），Tab 依次循环
 check("事件弹窗 Tab: 焦点到选项四", doc.activeElement === byId.choice3);
 key("Tab");
-check("事件弹窗 Tab: 循环回选项三", doc.activeElement === byId.choice2);
+check("事件弹窗 Tab: 焦点到选项五", doc.activeElement === byId.choice4);
+key("Tab");
+check("事件弹窗 Tab: 末尾循环回选项三", doc.activeElement === byId.choice2);
 
 click(byId.choice2); // 暴雨：冒雨加固，体力-1、危险-1
 check("选择后事件弹窗关闭", !eventOverlay.classList.contains("show"));

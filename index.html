@@ -426,6 +426,7 @@
       <button class="event-choice" id="choice1" hidden></button>
       <button class="event-choice" id="choice2" hidden></button>
       <button class="event-choice" id="choice3" hidden></button>
+      <button class="event-choice" id="choice4" hidden></button>
     </div>
   </div>
 </div>
@@ -578,6 +579,8 @@ let overOpen = false;    // 结局框是否打开（打开即本局结束，只�
 let gameOver = false;    // 本局是否已结束
 let lastFocused = null;
 let currentEvent = null; // 当前弹出的事件及所属日期
+let recentEventIds = [];  // 最近几晚出现过的事件 id（最新的在末尾），抽事件时避开
+const EVENT_MEMORY = 2;   // 抽事件时避开最近几晚，减少连续撞上同一件
 
 // ===== 随机事件表 =====
 // eff 中负数表示消耗：mat.* 材料 / item.* 背包制品；正数表示获得；sta 体力 / dan 危险
@@ -593,6 +596,7 @@ const EVENTS = [
       { text: "啃一份干粮顶住疲惫", eff: { "item.ration": -1, sta: 1 } },
       { text: "冒雨出去加固帐篷", eff: { sta: -1, dan: -1 } },
       { text: "蒙住头硬扛到天亮", eff: { sta: -1, dan: 1 } },
+      { text: "拆几根木料把铺位垫高", eff: { "mat.wood": -1, dan: -1 } },
     ],
   },
   {
@@ -605,6 +609,7 @@ const EVENTS = [
       { text: "举火把冲出去驱赶", eff: { "item.torch": -1, sta: -1, dan: -2 } },
       { text: "抛出存粮引走兽群", eff: { "mat.food": -2, dan: -1 } },
       { text: "敲着锅整夜对峙", eff: { sta: -2, dan: -1 } },
+      { text: "揉碎草药撒在下风处掩盖人气", eff: { "mat.herb": -1, dan: -1 } },
     ],
   },
   {
@@ -617,6 +622,72 @@ const EVENTS = [
       { text: "分些食物，换他一捆柴火", eff: { "mat.food": -1, "mat.wood": 2 } },
       { text: "拿出草药以物易物", eff: { "mat.herb": -1, sta: 1 } },
       { text: "婉言谢绝，关门不纳", eff: {} },
+      { text: "送他一支火把照路", eff: { "item.torch": -1, "mat.food": 1, dan: -1 } },
+    ],
+  },
+  {
+    id: "cold",
+    icon: "❄️",
+    title: "寒潮",
+    desc: "后半夜气温骤降，白霜爬上睡袋边缘，篝火在寒风里缩成小小的一团。",
+    choices: [
+      { text: "点起火把给篝火添一把旺柴", eff: { "item.torch": -1, sta: 1 } },
+      { text: "啃一份干粮补充热量", eff: { "item.ration": -1, sta: 1 } },
+      { text: "捡回两捆枯枝把火生大", eff: { sta: -1, "mat.wood": 2 } },
+      { text: "缩成一团硬挨到天亮", eff: { sta: -2, dan: 1 } },
+      { text: "用多余木料把火堆围出挡风墙", eff: { "mat.wood": -1, dan: -1 } },
+    ],
+  },
+  {
+    id: "fever",
+    icon: "🤒",
+    title: "夜里发烧",
+    desc: "你在睡梦中冷一阵热一阵，醒来时额头滚烫，四肢像灌了铅一样沉。",
+    choices: [
+      { text: "煎一碗草药汤发发汗", eff: { "mat.herb": -2, sta: 2 } },
+      { text: "啃一份干粮垫垫肚子再睡", eff: { "item.ration": -1, sta: 1 } },
+      { text: "举火把烧锅热水擦身", eff: { "item.torch": -1, sta: 1 } },
+      { text: "裹紧睡袋硬扛过去", eff: { sta: -2, dan: 1 } },
+      { text: "省着用，只嚼一小撮草药", eff: { "mat.herb": -1, sta: 1 } },
+    ],
+  },
+  {
+    id: "insects",
+    icon: "🦟",
+    title: "虫群来袭",
+    desc: "不知从哪涌来大群飞虫，围着篝火嗡嗡乱撞，直往人脸上和领口里钻。",
+    choices: [
+      { text: "点燃草药熏烟驱虫", eff: { "mat.herb": -1, sta: 1, dan: -1 } },
+      { text: "举火把绕营地熏赶一圈", eff: { "item.torch": -1, dan: -1 } },
+      { text: "啃份干粮补充被搅没的精力", eff: { "item.ration": -1, sta: 1 } },
+      { text: "蒙头拍虫，折腾到半夜", eff: { sta: -1, dan: 1 } },
+      { text: "把篝火挪到上风处，借烟驱散", eff: { sta: -1, dan: -1 } },
+    ],
+  },
+  {
+    id: "cache",
+    icon: "📦",
+    title: "林间补给箱",
+    desc: "巡逻时你在灌木丛后发现一只半埋的旧木箱，锁扣早已锈死，里面似乎还有东西。",
+    choices: [
+      { text: "用一支火把烧断锈锁", eff: { "item.torch": -1, "mat.wood": 1, "mat.food": 1, "mat.herb": 1 } },
+      { text: "留一份干粮给后来者当谢礼再开", eff: { "item.ration": -1, "mat.food": 2 } },
+      { text: "硬撬开箱子，手心磨出了血泡", eff: { sta: -1, "mat.wood": 1, "mat.herb": 1 } },
+      { text: "来路不明，绕开为妙", eff: { dan: 1 } },
+      { text: "花时间小心拆开锈扣", eff: { sta: -1, "mat.food": 1, "mat.herb": 1 } },
+    ],
+  },
+  {
+    id: "wisp",
+    icon: "💠",
+    title: "鬼火",
+    desc: "营地外飘起一簇幽幽的蓝火，忽远忽近地招摇，夜风里还夹着细碎的低语。",
+    choices: [
+      { text: "点起火把守住篝火，火光照得鬼火不敢靠近", eff: { "item.torch": -1, dan: -2 } },
+      { text: "啃份干粮壮胆，静观其变", eff: { "item.ration": -1, dan: -1 } },
+      { text: "抛出草药粉借风送远蓝火", eff: { "mat.herb": -1, dan: -1 } },
+      { text: "装没看见，蒙头睡觉", eff: { sta: -1, dan: 1 } },
+      { text: "屏住呼吸等它自己飘走", eff: {} },
     ],
   },
 ];
@@ -748,7 +819,7 @@ const dangerEl = $("danger"), dangerStatEl = $("dangerStat");
 const overlayEl = $("confirmOverlay");
 const eventOverlayEl = $("eventOverlay");
 const eventTitleEl = $("eventTitle"), eventDescEl = $("eventDesc");
-const choiceEls = [$("choice0"), $("choice1"), $("choice2"), $("choice3")];
+const choiceEls = [$("choice0"), $("choice1"), $("choice2"), $("choice3"), $("choice4")];
 const gameEl = document.querySelector(".game");
 const remainApEl = $("remainAp"), remainDayEl = $("remainDay");
 const logEl = $("log");
@@ -1158,8 +1229,18 @@ function finishDay() {
 // ===== 随机事件 =====
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
+// 抽一件夜间随机事件：全表等概率抽，命中最近几晚刚出现过的就重抽，
+// 最多重试事件表长度次，尽量减少连续几晚撞上同一件；极端情况下仍抽不中
+// （理论概率极低）才放行当次结果。
 function drawEvent() {
-  return EVENTS[Math.floor(Math.random() * EVENTS.length)];
+  let ev = EVENTS[0];
+  for (let i = 0; i < EVENTS.length; i++) {
+    ev = EVENTS[Math.floor(Math.random() * EVENTS.length)];
+    if (!recentEventIds.includes(ev.id)) break;
+  }
+  recentEventIds.push(ev.id);
+  if (recentEventIds.length > EVENT_MEMORY) recentEventIds.shift();
+  return ev;
 }
 
 // eff 字段 → 中文名称
@@ -1319,6 +1400,7 @@ restartBtn.addEventListener("click", () => {
   overOpen = false;
   merchantOpen = false;
   merchantStock = [];
+  recentEventIds = []; // 新一局重新洗牌，开局不受上一局事件记忆影响
   overOverlayEl.classList.remove("show");
   merchantOverlayEl.classList.remove("show");
   gameEl.inert = false;

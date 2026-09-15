@@ -39,7 +39,7 @@ function loadGame(randFn) {
     "stamina","danger","dangerStat",
     "mWood","mFood","mHerb","iTorch","iRation","iTrap",
     "craftOverlay","closeCraft","craftTorch","craftRation","craftTrap",
-    "eventOverlay","eventTitle","eventDesc","choice0","choice1","choice2","choice3",
+    "eventOverlay","eventTitle","eventDesc","choice0","choice1","choice2","choice3","choice4",
     "overOverlay","overTitle","overDesc","overDays","overEval","overBest",
     "newRecordBadge","restartBtn","recordBtn","recordOverlay","recordDays","recordMeta","closeRecord",
     "merchantOverlay","closeMerchant","buyTorch","buyRation","buyTrap","buyTonic","buyCharm",
@@ -214,7 +214,7 @@ console.log("场景五：夜里举火把应对暴雨");
 // === 道具用在夜间事件：陷阱退兽（危险-2，不耗体力） ===
 console.log("场景六：夜里触发陷阱退野兽");
 {
-  const g = loadGame(() => 0.5); // 事件固定野兽
+  const g = loadGame(() => (1 + 0.5) / 8); // 8 件事件中索引 1 = 野兽靠近
   // 初始木头不够做陷阱（需木2食1，木只有2、食2 → 其实够！木2 食1 可以做）
   g.click(g.actionBtns[1]);
   check("陷阱配方初始即可做", g.byId.craftTrap.disabled === false);
@@ -259,23 +259,36 @@ console.log("场景八：缺少道具时事件选项置灰、点击无效");
 }
 
 // === 材料也能在事件中直接消耗（抛食物引走兽群） ===
-console.log("场景九：野兽夜抛存粮，食物-2");
+console.log("场景九：野兽夜抛存粮，食物-2；隔两晚再遇野兽时抛粮选项置灰");
 {
-  const g = loadGame(() => 0.5);
-  endDayAndChoose(g, 2); // 抛出存粮
+  // 事件序列：野兽(1) → 旅人(2) → 寒潮(3) → 野兽(1)
+  // 抽事件会排除最近两晚，四件都不在冷却里，直接给对应索引的 rng 即可
+  const rngs = [1.5, 2.5, 3.5, 1.5].map((i) => i / 8);
+  let ri = 0;
+  const g = loadGame(() => rngs[ri++]);
+  endDayAndChoose(g, 2); // 抛出存粮：食物-2
   const b = bag(g);
   check("食物 2 -> 0", b.food === 0);
   check("木头草药不变", b.wood === 2 && b.herb === 2);
-  // 再来一晚野兽：食物不足时选项置灰
-  g.click(g.byId.endDayBtn);
-  g.click(g.byId.confirmEnd);
+  // 隔两晚（旅人谢绝、寒潮硬挨）后野兽再次来袭
+  g.click(g.byId.endDayBtn); g.click(g.byId.confirmEnd);
+  check("第二晚先抽到旅人", g.byId.eventTitle.textContent.includes("旅人"));
+  g.click(g.byId.choice3);
+  if (g.byId.merchantOverlay.classList.contains("show")) g.click(g.byId.closeMerchant);
+  g.click(g.byId.endDayBtn); g.click(g.byId.confirmEnd);
+  check("第三晚抽到寒潮", g.byId.eventTitle.textContent.includes("寒潮"));
+  g.click(g.byId.choice3); // 硬挨到天亮（第 3 天深夜商人到访，送走）
+  if (g.byId.merchantOverlay.classList.contains("show")) g.click(g.byId.closeMerchant);
+  g.click(g.byId.endDayBtn); g.click(g.byId.confirmEnd);
+  check("第四晚野兽再次来袭", g.byId.eventTitle.textContent.includes("野兽靠近"));
   check("食物不足时抛粮选项置灰", g.byId.choice2.disabled === true);
+  g.click(g.byId.choice3); // 敲锅对峙过关
 }
 
 // === 旅人事件：以物易物（食物换木头） ===
 console.log("场景十：旅人以食物换柴火");
 {
-  const g = loadGame(() => 0.99);
+  const g = loadGame(() => (2 + 0.5) / 8); // 索引 2 = 路过的旅人
   endDayAndChoose(g, 1); // 分食物换柴火
   const b = bag(g);
   check("食物 2 -> 1", b.food === 1);
