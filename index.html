@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>荒野营地求生</title>
+<style>
+  :root {
+    --bg: #14161c;
+    --panel: #1e222c;
+    --panel-2: #262b38;
+    --text: #e8eaf0;
+    --muted: #9aa3b5;
+    --accent: #e8a84a;
+    --accent-dim: #8a6326;
+    --danger: #e06a5a;
+    --ok: #6ec07a;
+    --border: #333a49;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .game {
+    width: 100%;
+    max-width: 520px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.4);
+  }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .day { font-size: 22px; font-weight: 700; }
+  .phase { color: var(--muted); font-size: 14px; }
+
+  /* 体力 / 危险值 */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin: 14px 0 12px;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    transition: box-shadow .15s, border-color .15s;
+  }
+  .stat-label { color: var(--muted); font-size: 12px; }
+  .stat-val { font-size: 20px; font-weight: 700; }
+  .stat-val.stam { color: var(--ok); }
+  .stat-val.dan { color: var(--danger); }
+  .stat.high {
+    border-color: var(--danger);
+    box-shadow: 0 0 12px rgba(224,106,90,.25);
+  }
+
+  /* 小背包：材料与制品各占一行，数量一眼可见 */
+  .bag {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin: 0 0 16px;
+  }
+  .bag-title { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .bag-row { display: flex; gap: 8px; }
+  .bag-row + .bag-row { margin-top: 8px; }
+  .bag-item {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 4px;
+    font-size: 14px;
+  }
+  .bag-item .num { font-weight: 700; color: var(--accent); min-width: 1.2em; text-align: center; }
+  .bag-item.item .num { color: var(--ok); }
+  .bag-item.zero { opacity: .4; }
+
+  .ap-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 20px;
+    padding: 14px 16px;
+    background: var(--panel-2);
+    border-radius: 10px;
+  }
+  .ap-label { color: var(--muted); font-size: 14px; }
+  .pips { display: flex; gap: 8px; }
+  .pip {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--accent-dim);
+    background: transparent;
+    transition: all .15s;
+  }
+  .pip.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 10px rgba(232,168,74,.5);
+  }
+  .pip.off { opacity: .25; }
+  .ap-count { margin-left: auto; font-weight: 700; color: var(--accent); }
+
+  .actions { display: flex; flex-direction: column; gap: 10px; }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    background: var(--panel-2);
+    color: var(--text);
+    transition: filter .12s, transform .05s;
+  }
+  button:hover:not(:disabled) { filter: brightness(1.15); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .cost { color: var(--muted); font-size: 13px; margin-left: 6px; }
+  .end-day {
+    margin-top: 18px;
+    width: 100%;
+    background: #3a2f1e;
+    border-color: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .log {
+    margin-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    max-height: 120px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .log div::before { content: "· "; }
+
+  /* modal */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 10;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    width: 100%;
+    max-width: 400px;
+    /* 矮窗口（手机横屏等）下弹窗内容可超出视口：限制高度并允许内部纵向滚动 */
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    background: var(--panel);
+    border: 1px solid var(--danger);
+    border-radius: 12px;
+    padding: 22px;
+    box-shadow: 0 0 30px rgba(224,106,90,.15);
+  }
+  .modal h3 { margin: 0 0 10px; font-size: 17px; }
+  .modal h3 .warn { color: var(--danger); }
+  .modal p { margin: 0 0 8px; color: var(--text); line-height: 1.6; font-size: 14px; }
+  .modal .sub { color: var(--muted); font-size: 13px; }
+  .modal .remaining {
+    display: inline-block;
+    min-width: 1.2em;
+    padding: 0 6px;
+    margin: 0 2px;
+    border-radius: 5px;
+    background: rgba(232,168,74,.18);
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-btns button { flex: 1; }
+  .btn-cancel {
+    background: var(--panel-2);
+  }
+  .btn-confirm {
+    background: #4a2420;
+    border-color: var(--danger);
+    color: #ffb0a4;
+  }
+
+  /* 夜间随机事件弹窗 */
+  .event-modal {
+    max-width: 440px;
+    border-color: var(--accent-dim);
+    box-shadow: 0 0 30px rgba(232,168,74,.18);
+  }
+  .event-modal h3 { color: var(--accent); font-size: 18px; }
+  .event-modal .event-desc { color: var(--text); }
+  .event-modal .event-tip {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .event-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 18px;
+  }
+  .event-choice {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    text-align: left;
+    background: var(--panel-2);
+  }
+  .event-choice[hidden] { display: none; }
+  .event-choice:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+    filter: none;
+  }
+  .choice-text { flex: 1; }
+  .hint {
+    display: inline-flex;
+    gap: 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    color: var(--muted);
+  }
+  .hint .up { color: var(--ok); }
+  .hint .down { color: var(--danger); }
+  .hint .zero { color: var(--muted); }
+
+  /* 制作台弹窗：打开期间可连续制作，关闭后继续用剩余行动点 */
+  .craft-modal {
+    max-width: 420px;
+    border-color: var(--accent-dim);
+    box-shadow: 0 0 30px rgba(232,168,74,.15);
+  }
+  .craft-modal h3 { color: var(--accent); }
+  .recipe-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .recipe {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    background: var(--panel-2);
+    padding: 10px 14px;
+  }
+  .recipe:disabled { opacity: .45; cursor: not-allowed; }
+  .recipe .r-icon { font-size: 20px; }
+  .recipe .r-body { flex: 1; }
+  .recipe .r-name { font-size: 14px; font-weight: 600; }
+  .recipe .r-desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .recipe .r-cost { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .recipe .r-cost .lack { color: var(--danger); }
+
+  /* 流浪商人弹窗：每隔几天深夜到访，材料按浮动行情换购，稀有物资限购 */
+  .merchant-modal {
+    max-width: 420px;
+    border-color: var(--accent-dim);
+    box-shadow: 0 0 30px rgba(232,168,74,.15);
+  }
+  .merchant-modal h3 { color: var(--accent); }
+  .rare-tag {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(232,168,74,.18);
+    color: var(--accent);
+    font-size: 11px;
+    vertical-align: 1px;
+  }
+  .recipe .r-cost .done { color: var(--ok); }
+
+  /* 顶部纪录按钮 */
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .record-btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--accent);
+    border-color: var(--accent-dim);
+  }
+
+  /* 生存结局弹窗 */
+  .over-modal { max-width: 420px; text-align: center; }
+  .over-modal h3 { font-size: 20px; }
+  .over-result { margin: 16px 0 4px; }
+  .over-days { font-size: 46px; font-weight: 800; color: var(--accent); line-height: 1.1; }
+  .over-days .unit { font-size: 15px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+  .over-caption { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .over-eval { margin-top: 14px; line-height: 1.7; }
+  .new-record {
+    display: inline-block;
+    margin: 10px 0 0;
+    padding: 4px 14px;
+    border-radius: 999px;
+    background: rgba(232,168,74,.18);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .new-record[hidden] { display: none; }
+  .over-best { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .btn-restart {
+    background: #3a2f1e;
+    border-color: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* 最佳纪录弹窗 */
+  .record-modal {
+    max-width: 360px;
+    border-color: var(--accent-dim);
+    box-shadow: 0 0 30px rgba(232,168,74,.15);
+  }
+  .record-modal h3 { color: var(--accent); }
+  .record-days { font-size: 26px; font-weight: 800; color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="game">
+  <div class="topbar">
+    <div class="day">第 <span id="day">1</span> 天</div>
+    <div class="topbar-right">
+      <div class="phase" id="phase">夜晚</div>
+      <button class="record-btn" id="recordBtn" type="button">🏆 纪录</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <span class="stat-label">❤ 体力</span>
+      <span class="stat-val stam" id="stamina">6</span>
+    </div>
+    <div class="stat" id="dangerStat">
+      <span class="stat-label">☠ 危险</span>
+      <span class="stat-val dan" id="danger">0</span>
+    </div>
+  </div>
+
+  <div class="bag">
+    <div class="bag-title">🎒 小背包</div>
+    <div class="bag-row" id="bagMaterials">
+      <span class="bag-item"><span>🪵 木头</span><span class="num" id="mWood">2</span></span>
+      <span class="bag-item"><span>🍖 食物</span><span class="num" id="mFood">2</span></span>
+      <span class="bag-item"><span>🌿 草药</span><span class="num" id="mHerb">2</span></span>
+    </div>
+    <div class="bag-row" id="bagItems">
+      <span class="bag-item item"><span>🔥 火把</span><span class="num" id="iTorch">0</span></span>
+      <span class="bag-item item"><span>🥖 干粮</span><span class="num" id="iRation">0</span></span>
+      <span class="bag-item item"><span>🪤 陷阱</span><span class="num" id="iTrap">0</span></span>
+    </div>
+  </div>
+
+  <div class="ap-row">
+    <span class="ap-label">行动点</span>
+    <div class="pips" id="pips"></div>
+    <span class="ap-count"><span id="apLeft">2</span> / <span id="apMax">2</span></span>
+  </div>
+
+  <div class="actions">
+    <button data-act="explore" data-cost="1">外出探索<span class="cost">消耗 1 点 · 带回材料</span></button>
+    <button data-act="craft" data-cost="1">使用制作台<span class="cost">消耗 1 点 · 制作道具</span></button>
+    <button data-act="rest" data-cost="1">整理营地<span class="cost">消耗 1 点</span></button>
+    <button data-act="guard" data-cost="2">通宵守夜<span class="cost">消耗 2 点</span></button>
+  </div>
+
+  <button class="end-day" id="endDayBtn">结束当日，进入下一天 →</button>
+
+  <div class="log" id="log"></div>
+</div>
+
+<!-- 剩余行动点确认弹窗 -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h3 id="confirmTitle"><span class="warn">⚠ 行动点尚未用完</span></h3>
+    <p>本时段还剩 <span class="remaining" id="remainAp">2</span> 点行动点未使用，结束当日后将被<span style="color:var(--danger)">放弃</span>，无法顺延到明天。</p>
+    <p class="sub">确定要现在结束第 <span id="remainDay">1</span> 天吗？</p>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="cancelEnd">再行动一会儿</button>
+      <button class="btn-confirm" id="confirmEnd">放弃点数并结束</button>
+    </div>
+  </div>
+</div>
+
+<!-- 夜间随机事件弹窗：每次结束当日抽一件，必须做出选择 -->
+<div class="overlay" id="eventOverlay">
+  <div class="modal event-modal" role="dialog" aria-modal="true" aria-labelledby="eventTitle">
+    <h3 id="eventTitle"></h3>
+    <p class="event-desc" id="eventDesc"></p>
+    <p class="event-tip">深夜遭遇突发事件，选择如何应对：</p>
+    <div class="event-choices" id="eventChoices">
+      <button class="event-choice" id="choice0" hidden></button>
+      <button class="event-choice" id="choice1" hidden></button>
+      <button class="event-choice" id="choice2" hidden></button>
+      <button class="event-choice" id="choice3" hidden></button>
+    </div>
+  </div>
+</div>
+
+<!-- 生存结局弹窗：体力归零或危险顶格时出现，只能「再来一局」 -->
+<div class="overlay" id="overOverlay">
+  <div class="modal over-modal" role="dialog" aria-modal="true" aria-labelledby="overTitle">
+    <h3 id="overTitle"></h3>
+    <p class="sub" id="overDesc"></p>
+    <div class="over-result">
+      <div class="over-days"><span id="overDays">0</span><span class="unit">天</span></div>
+      <div class="over-caption">生存天数</div>
+    </div>
+    <p class="over-eval" id="overEval"></p>
+    <p class="new-record" id="newRecordBadge" hidden>🎉 新纪录！</p>
+    <p class="over-best" id="overBest"></p>
+    <div class="modal-btns">
+      <button class="btn-restart" id="restartBtn">🔁 再来一局</button>
+    </div>
+  </div>
+</div>
+
+<!-- 制作台弹窗：消耗 1 点行动点后打开，可连续制作火把/干粮/陷阱，材料不足的配方置灰 -->
+<div class="overlay" id="craftOverlay">
+  <div class="modal craft-modal" role="dialog" aria-modal="true" aria-labelledby="craftTitle">
+    <h3 id="craftTitle">🛠 制作台</h3>
+    <p class="sub">借着篝火赶制夜里能用得上的东西，做好后自动收进背包。</p>
+    <div class="recipe-list">
+      <button class="recipe" id="craftTorch" type="button">
+        <span class="r-icon">🔥</span>
+        <span class="r-body">
+          <span class="r-name">火把</span>
+          <span class="r-desc">夜里照明，暴雨里护火、野兽来了也能壮胆驱赶。</span>
+        </span>
+        <span class="r-cost" id="costTorch">🪵1 🌿1</span>
+      </button>
+      <button class="recipe" id="craftRation" type="button">
+        <span class="r-icon">🥖</span>
+        <span class="r-body">
+          <span class="r-name">干粮</span>
+          <span class="r-desc">耐存的便携口粮，深夜吃上一份能立刻恢复体力。</span>
+        </span>
+        <span class="r-cost" id="costRation">🍖2 🌿1</span>
+      </button>
+      <button class="recipe" id="craftTrap" type="button">
+        <span class="r-icon">🪤</span>
+        <span class="r-body">
+          <span class="r-name">陷阱</span>
+          <span class="r-desc">布在营地四周，野兽靠近时触发，毫发无伤地退敌。</span>
+        </span>
+        <span class="r-cost" id="costTrap">🪵2 🍖1</span>
+      </button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="closeCraft">收起制作台</button>
+    </div>
+  </div>
+</div>
+
+<!-- 流浪商人弹窗：每 3 天深夜事件后到访，材料按浮动行情换制品与稀有物资，可连续成交 -->
+<div class="overlay" id="merchantOverlay">
+  <div class="modal merchant-modal" role="dialog" aria-modal="true" aria-labelledby="merchantTitle">
+    <h3 id="merchantTitle">🪙 流浪商人</h3>
+    <p class="sub">深夜路过的商人愿意收下你的多余材料。行情每次到访都会浮动，稀有物资每次限购一件。</p>
+    <div class="recipe-list">
+      <button class="recipe" id="buyTorch" type="button">
+        <span class="r-icon">🔥</span>
+        <span class="r-body">
+          <span class="r-name">火把</span>
+          <span class="r-desc">夜里照明，暴雨护火、驱赶野兽都用得上。</span>
+        </span>
+        <span class="r-cost" id="costBuyTorch"></span>
+      </button>
+      <button class="recipe" id="buyRation" type="button">
+        <span class="r-icon">🥖</span>
+        <span class="r-body">
+          <span class="r-name">干粮</span>
+          <span class="r-desc">耐存的便携口粮，深夜吃上一份能立刻恢复体力。</span>
+        </span>
+        <span class="r-cost" id="costBuyRation"></span>
+      </button>
+      <button class="recipe" id="buyTrap" type="button">
+        <span class="r-icon">🪤</span>
+        <span class="r-body">
+          <span class="r-name">陷阱</span>
+          <span class="r-desc">布在营地四周，野兽靠近时触发，毫发无伤地退敌。</span>
+        </span>
+        <span class="r-cost" id="costBuyTrap"></span>
+      </button>
+      <button class="recipe" id="buyTonic" type="button">
+        <span class="r-icon">🧪</span>
+        <span class="r-body">
+          <span class="r-name">秘药<span class="rare-tag">稀有</span></span>
+          <span class="r-desc">商队秘制的药剂，喝下立刻体力 +3。每次到访限购一件。</span>
+        </span>
+        <span class="r-cost" id="costBuyTonic"></span>
+      </button>
+      <button class="recipe" id="buyCharm" type="button">
+        <span class="r-icon">🧿</span>
+        <span class="r-body">
+          <span class="r-name">护身符<span class="rare-tag">稀有</span></span>
+          <span class="r-desc">刻着符文的骨片，挂在营地震慑野兽，危险 -2。每次到访限购一件。</span>
+        </span>
+        <span class="r-cost" id="costBuyCharm"></span>
+      </button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="closeMerchant">送走商人</button>
+    </div>
+  </div>
+</div>
+
+<!-- 最佳纪录弹窗：游戏中随时可打开翻看 -->
+<div class="overlay" id="recordOverlay">
+  <div class="modal record-modal" role="dialog" aria-modal="true" aria-labelledby="recordTitle">
+    <h3 id="recordTitle">🏆 最佳纪录</h3>
+    <p>最长生存：<span class="record-days" id="recordDays">–</span> 天</p>
+    <p class="sub" id="recordMeta"></p>
+    <div class="modal-btns">
+      <button class="btn-cancel" id="closeRecord">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ===== 游戏状态 =====
+const AP_PER_NIGHT = 2; // 夜晚可用行动点
+// mat 材料（探索获取）/ item 制品（制作台合成）/ sta 体力 / dan 危险
+const STAT_CAP = { sta: 10, dan: 10, pool: 99 };
+const INIT_MATS = { wood: 2, food: 2, herb: 2 }; // 初始背包里的材料
+
+const state = {
+  day: 1,
+  apMax: AP_PER_NIGHT,
+  ap: AP_PER_NIGHT,
+  mats: { ...INIT_MATS },
+  items: { torch: 0, ration: 0, trap: 0 },
+  stamina: 6,
+  danger: 0,
+};
+
+let confirmOpen = false; // 行动点确认框是否打开
+let eventOpen = false;   // 随机事件框是否打开（打开期间锁定背景，且必须做出选择）
+let craftOpen = false;   // 制作台框是否打开（打开期间锁定背景，可连续制作）
+let merchantOpen = false; // 商人框是否打开（打开期间锁定背景，可连续成交）
+let recordOpen = false;  // 最佳纪录框是否打开
+let overOpen = false;    // 结局框是否打开（打开即本局结束，只能重来）
+let gameOver = false;    // 本局是否已结束
+let lastFocused = null;
+let currentEvent = null; // 当前弹出的事件及所属日期
+
+// ===== 随机事件表 =====
+// eff 中负数表示消耗：mat.* 材料 / item.* 背包制品；正数表示获得；sta 体力 / dan 危险
+// 选项只要带负向消耗，材料或道具不足时就会置灰
+const EVENTS = [
+  {
+    id: "storm",
+    icon: "🌧",
+    title: "暴雨",
+    desc: "乌云压顶，暴雨连夜泼下。帐篷在风里发抖，地面积水正往营地里灌。",
+    choices: [
+      { text: "点起火把护住篝火，连夜加固帐篷", eff: { "item.torch": -1, sta: 1, dan: -2 } },
+      { text: "啃一份干粮顶住疲惫", eff: { "item.ration": -1, sta: 1 } },
+      { text: "冒雨出去加固帐篷", eff: { sta: -1, dan: -1 } },
+      { text: "蒙住头硬扛到天亮", eff: { sta: -1, dan: 1 } },
+    ],
+  },
+  {
+    id: "beasts",
+    icon: "🐺",
+    title: "野兽靠近",
+    desc: "火光外亮起一圈眼睛，低吼声绕着营地打转——有野兽在试探与营地的距离。",
+    choices: [
+      { text: "触发预设的陷阱，兽群负伤逃走", eff: { "item.trap": -1, dan: -2 } },
+      { text: "举火把冲出去驱赶", eff: { "item.torch": -1, sta: -1, dan: -2 } },
+      { text: "抛出存粮引走兽群", eff: { "mat.food": -2, dan: -1 } },
+      { text: "敲着锅整夜对峙", eff: { sta: -2, dan: -1 } },
+    ],
+  },
+  {
+    id: "traveler",
+    icon: "🧳",
+    title: "路过的旅人",
+    desc: "一个背着大包袱的旅人路过营地，停下脚步，又累又警惕地望着你。",
+    choices: [
+      { text: "送他一份干粮路上吃，换他的消息", eff: { "item.ration": -1, dan: -1 } },
+      { text: "分些食物，换他一捆柴火", eff: { "mat.food": -1, "mat.wood": 2 } },
+      { text: "拿出草药以物易物", eff: { "mat.herb": -1, sta: 1 } },
+      { text: "婉言谢绝，关门不纳", eff: {} },
+    ],
+  },
+];
+
+// ===== 生存结局表 =====
+// 触发条件见 checkGameOver：体力归零 → exhausted；危险顶格 → overrun
+const ENDINGS = {
+  exhausted: {
+    icon: "🕯",
+    title: "体力耗尽",
+    desc: "你再也撑不住沉重的身体，倒在熄灭的篝火旁。这一夜，营地安静得只剩风声。",
+  },
+  overrun: {
+    icon: "☠",
+    title: "危险爆发",
+    desc: "危险终于越过了临界点，黑影吞没了营地。你没能看到第二天的太阳。",
+  },
+};
+
+// 按生存天数给出结局评语
+function evaluation(days) {
+  if (days <= 3) return "昙花一现的抵抗——荒野甚至还没来得及记住你的名字。";
+  if (days <= 7) return "你撑过了数个昼夜，但荒野真正的考验才刚刚开始。";
+  if (days <= 14) return "超过一周的坚守，足以让最老练的猎人点头致意。";
+  if (days <= 29) return "大半月的求生，你已成为这片荒野传说的一部分。";
+  return "不可思议的持久！后来者会围着篝火，一遍遍讲述你的故事。";
+}
+
+// ===== 材料 / 制品元数据与配方 =====
+// key 前缀：mat.* 探索获得的材料，item.* 制作台做出的道具
+const RESOURCE_META = {
+  "mat.wood":   { icon: "🪵", name: "木头", type: "mat" },
+  "mat.food":   { icon: "🍖", name: "食物", type: "mat" },
+  "mat.herb":   { icon: "🌿", name: "草药", type: "mat" },
+  "item.torch": { icon: "🔥", name: "火把", type: "item" },
+  "item.ration":{ icon: "🥖", name: "干粮", type: "item" },
+  "item.trap":  { icon: "🪤", name: "陷阱", type: "item" },
+};
+const POOL_KEYS = Object.keys(RESOURCE_META); // 结算时按固定顺序遍历，便于阅读与测试
+
+// 制作台配方：cost 为材料消耗，out 为产出的制品（一次一件）
+const RECIPES = [
+  { id: "torch",  btnId: "craftTorch",  name: "火把", cost: { "mat.wood": 1, "mat.herb": 1 } },
+  { id: "ration", btnId: "craftRation", name: "干粮", cost: { "mat.food": 2, "mat.herb": 1 } },
+  { id: "trap",   btnId: "craftTrap",   name: "陷阱", cost: { "mat.wood": 2, "mat.food": 1 } },
+];
+
+// ===== 流浪商人 =====
+// 每 MERCHANT_INTERVAL 天的深夜（随机事件结算后）到访一次：
+// 制品可反复换购，稀有物资每次到访限购一件；价格按到访日在区间内浮动。
+const MERCHANT_INTERVAL = 3;
+const MERCHANT_OFFERS = [
+  { id: "torch",  btnId: "buyTorch",  costId: "costBuyTorch",  icon: "🔥", name: "火把",
+    gives: { "item.torch": 1 }, range: { "mat.wood": [1, 2], "mat.herb": [1, 1] } },
+  { id: "ration", btnId: "buyRation", costId: "costBuyRation", icon: "🥖", name: "干粮",
+    gives: { "item.ration": 1 }, range: { "mat.food": [2, 3], "mat.herb": [1, 1] } },
+  { id: "trap",   btnId: "buyTrap",   costId: "costBuyTrap",   icon: "🪤", name: "陷阱",
+    gives: { "item.trap": 1 }, range: { "mat.wood": [2, 3], "mat.food": [1, 1] } },
+  { id: "tonic",  btnId: "buyTonic",  costId: "costBuyTonic",  icon: "🧪", name: "秘药", rare: true,
+    gives: { sta: 3 }, range: { "mat.herb": [2, 3], "mat.food": [1, 2] } },
+  { id: "charm",  btnId: "buyCharm",  costId: "costBuyCharm",  icon: "🧿", name: "护身符", rare: true,
+    gives: { dan: -2 }, range: { "mat.wood": [2, 3], "mat.herb": [2, 2] } },
+];
+
+// 由日期与货品位次决定的伪随机数：同一晚行情固定、不同晚浮动，且不消耗 Math.random
+function hashRand(a, b, c) {
+  let h = 2166136261;
+  [a, b, c].forEach((n) => {
+    h ^= n + 1;
+    h = Math.imul(h, 16777619);
+  });
+  h ^= h >>> 13;
+  h = Math.imul(h, 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+function poolAmount(key) {
+  const meta = RESOURCE_META[key];
+  const id = key.split(".")[1];
+  return meta.type === "mat" ? state.mats[id] : state.items[id];
+}
+function setPoolAmount(key, val) {
+  const meta = RESOURCE_META[key];
+  const id = key.split(".")[1];
+  if (meta.type === "mat") state.mats[id] = val;
+  else state.items[id] = val;
+}
+function canAfford(cost) {
+  return POOL_KEYS.every((k) => poolAmount(k) >= (cost[k] || 0));
+}
+
+// ===== 最佳纪录（存 localStorage，随时可查）=====
+const BEST_KEY = "camp-survival-best";
+// 隐私模式等场景下访问 localStorage 会抛错；测试环境也可能没有，统一兜底为 null
+const storage = (() => {
+  try {
+    if (typeof localStorage !== "undefined") return localStorage;
+  } catch (e) { /* 忽略，按无存储处理 */ }
+  return null;
+})();
+
+function loadBest() {
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(BEST_KEY);
+    if (!raw) return null;
+    const rec = JSON.parse(raw);
+    if (!rec || typeof rec.days !== "number") return null; // 数据损坏就当没有
+    return rec;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveBest(rec) {
+  if (!storage) return;
+  try {
+    storage.setItem(BEST_KEY, JSON.stringify(rec));
+  } catch (e) { /* 写入失败不耽误本局结算 */ }
+}
+
+// ===== DOM =====
+const $ = (id) => document.getElementById(id);
+const dayEl = $("day"), phaseEl = $("phase");
+const pipsEl = $("pips"), apLeftEl = $("apLeft"), apMaxEl = $("apMax");
+const staminaEl = $("stamina");
+const dangerEl = $("danger"), dangerStatEl = $("dangerStat");
+const overlayEl = $("confirmOverlay");
+const eventOverlayEl = $("eventOverlay");
+const eventTitleEl = $("eventTitle"), eventDescEl = $("eventDesc");
+const choiceEls = [$("choice0"), $("choice1"), $("choice2"), $("choice3")];
+const gameEl = document.querySelector(".game");
+const remainApEl = $("remainAp"), remainDayEl = $("remainDay");
+const logEl = $("log");
+const cancelBtn = $("cancelEnd"), confirmBtn = $("confirmEnd");
+const endDayBtn = $("endDayBtn");
+const recordBtn = $("recordBtn"), recordOverlayEl = $("recordOverlay");
+const recordDaysEl = $("recordDays"), recordMetaEl = $("recordMeta");
+const closeRecordBtn = $("closeRecord");
+const overOverlayEl = $("overOverlay");
+const overTitleEl = $("overTitle"), overDescEl = $("overDesc");
+const overDaysEl = $("overDays"), overEvalEl = $("overEval"), overBestEl = $("overBest");
+const newRecordEl = $("newRecordBadge"), restartBtn = $("restartBtn");
+const bagNumEls = {
+  "mat.wood": $("mWood"), "mat.food": $("mFood"), "mat.herb": $("mHerb"),
+  "item.torch": $("iTorch"), "item.ration": $("iRation"), "item.trap": $("iTrap"),
+};
+const bagItemEls = Array.from(document.querySelectorAll(".bag-item"));
+const craftOverlayEl = $("craftOverlay");
+const closeCraftBtn = $("closeCraft");
+const craftRecipeBtns = [$("craftTorch"), $("craftRation"), $("craftTrap")];
+const merchantOverlayEl = $("merchantOverlay");
+const closeMerchantBtn = $("closeMerchant");
+const merchantBuyBtns = MERCHANT_OFFERS.map((o) => $(o.btnId));
+
+let merchantDay = 0;    // 本次商人到访所属的日期（写日志用）
+let merchantStock = []; // 本次到访的行情：{ offer, cost, soldOut }
+
+// ===== 渲染 =====
+function render() {
+  dayEl.textContent = state.day;
+  phaseEl.textContent = "夜晚";
+  apLeftEl.textContent = state.ap;
+  apMaxEl.textContent = state.apMax;
+  staminaEl.textContent = state.stamina;
+  dangerEl.textContent = state.danger;
+  dangerStatEl.classList.toggle("high", state.danger >= 7);
+
+  // 背包：每种材料 / 制品的数量，数量为 0 的制品置灰
+  POOL_KEYS.forEach((key) => {
+    bagNumEls[key].textContent = poolAmount(key);
+  });
+  bagItemEls.forEach((el) => {
+    const numEl = el.querySelector(".num");
+    el.classList.toggle("zero", Number(numEl.textContent) === 0);
+  });
+
+  pipsEl.innerHTML = "";
+  for (let i = 0; i < state.apMax; i++) {
+    const pip = document.createElement("span");
+    pip.className = "pip " + (i < state.ap ? "on" : "off");
+    pipsEl.appendChild(pip);
+  }
+
+  document.querySelectorAll("[data-cost]").forEach((btn) => {
+    btn.disabled = gameOver || state.ap < Number(btn.dataset.cost);
+  });
+  endDayBtn.disabled = gameOver;
+}
+
+function addLog(text) {
+  const line = document.createElement("div");
+  line.textContent = text;
+  logEl.prepend(line);
+}
+
+// ===== 行动 =====
+const ACT_NAMES = {
+  explore: "外出探索",
+  craft: "使用制作台",
+  rest: "整理营地",
+  guard: "通宵守夜",
+};
+const MAT_KEYS = ["wood", "food", "herb"];
+
+// 探索收获：随机挑 1～2 种材料，各 +1（数量钳制在上限内）
+function rollExploreYield() {
+  const n = Math.random() < 0.5 ? 1 : 2;
+  const pool = MAT_KEYS.slice();
+  const yield_ = {};
+  for (let i = 0; i < n; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    const key = pool.splice(idx, 1)[0];
+    yield_[key] = 1;
+  }
+  return yield_;
+}
+
+document.querySelectorAll("[data-cost]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    // 保险：本局已结束或任何弹窗打开期间，背景行动一律不生效
+    if (gameOver || confirmOpen || eventOpen || craftOpen || merchantOpen || recordOpen) return;
+    const act = btn.dataset.act;
+    const cost = Number(btn.dataset.cost);
+    if (state.ap < cost) return;
+    state.ap -= cost;
+    addLog(`第 ${state.day} 天夜晚：${ACT_NAMES[act]}（-${cost} 点）`);
+    if (act === "explore") {
+      const yield_ = rollExploreYield();
+      const got = Object.keys(yield_)
+        .map((k) => {
+          const key = "mat." + k;
+          setPoolAmount(key, clamp(poolAmount(key) + yield_[k], 0, STAT_CAP.pool));
+          return `${RESOURCE_META[key].icon}${RESOURCE_META[key].name}+${yield_[k]}`;
+        });
+      addLog(`　└ 探索归来，带回：${got.join("、")}`);
+    } else if (act === "craft") {
+      showCraft(); // 制作台弹窗：打开期间可连续制作，关闭后仍能用剩余行动点
+    }
+    render();
+  });
+});
+
+// ===== 结束当日 =====
+endDayBtn.addEventListener("click", () => {
+  if (gameOver || confirmOpen || eventOpen || craftOpen || merchantOpen || recordOpen) return;
+  requestEndDay();
+});
+cancelBtn.addEventListener("click", hideConfirm);
+confirmBtn.addEventListener("click", () => {
+  if (!confirmOpen) return; // 弹窗没打开时的意外点击不结算
+  hideConfirm();
+  finishDay();
+});
+
+// Esc 关闭确认框 = 取消；Tab 焦点锁在弹窗内
+overlayEl.addEventListener("mousedown", (e) => {
+  if (e.target === overlayEl) hideConfirm();
+});
+// 事件弹窗不允许点遮罩关闭：事件必须做出选择
+eventOverlayEl.addEventListener("mousedown", () => {});
+// 制作台弹窗：点遮罩或「收起」均可关闭，行动点在打开时已扣除
+craftOverlayEl.addEventListener("mousedown", (e) => {
+  if (e.target === craftOverlayEl) hideCraft();
+});
+closeCraftBtn.addEventListener("click", hideCraft);
+// 商人弹窗：点遮罩或「送走商人」均可关闭，成交记录已写入日志
+merchantOverlayEl.addEventListener("mousedown", (e) => {
+  if (e.target === merchantOverlayEl) hideMerchant();
+});
+closeMerchantBtn.addEventListener("click", hideMerchant);
+// 纪录弹窗可以点遮罩关闭
+recordOverlayEl.addEventListener("mousedown", (e) => {
+  if (e.target === recordOverlayEl) hideRecord();
+});
+// 结局弹窗不响应遮罩：本局已结束，只能点「再来一局」
+document.addEventListener("keydown", (e) => {
+  if (eventOpen) {
+    // 事件弹窗：Tab 在可用选项间循环；Esc 不关闭，必须选一项
+    if (e.key === "Tab") {
+      e.preventDefault();
+      cycleFocus(e, choiceEls.filter((b) => !b.hidden && !b.disabled));
+    }
+    return;
+  }
+  if (overOpen) {
+    // 结局弹窗：Esc 不关闭，Tab 锁在「再来一局」上
+    if (e.key === "Tab") {
+      e.preventDefault();
+      cycleFocus(e, [restartBtn]);
+    }
+    return;
+  }
+  if (craftOpen) {
+    // 制作台弹窗：Esc 收起；Tab 在可做配方与收起按钮间循环
+    if (e.key === "Escape") {
+      e.preventDefault();
+      hideCraft();
+      return;
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      cycleFocus(e, craftRecipeBtns.filter((b) => !b.disabled).concat(closeCraftBtn));
+    }
+    return;
+  }
+  if (merchantOpen) {
+    // 商人弹窗：Esc 送走商人；Tab 在可成交的货物与「送走商人」间循环
+    if (e.key === "Escape") {
+      e.preventDefault();
+      hideMerchant();
+      return;
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      cycleFocus(e, merchantBuyBtns.filter((b) => !b.disabled).concat(closeMerchantBtn));
+    }
+    return;
+  }
+  if (recordOpen) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      hideRecord();
+      return;
+    }
+    if (e.key === "Tab") {
+      e.preventDefault();
+      cycleFocus(e, [closeRecordBtn]);
+    }
+    return;
+  }
+  if (!confirmOpen) return;
+  if (e.key === "Escape") {
+    e.preventDefault();
+    hideConfirm();
+    return;
+  }
+  if (e.key === "Tab") {
+    // 显式接管焦点移动，在弹窗两个按钮间循环，不依赖默认 Tab 行为
+    e.preventDefault();
+    cycleFocus(e, [cancelBtn, confirmBtn]);
+  }
+});
+
+function cycleFocus(e, list) {
+  const idx = list.indexOf(document.activeElement);
+  const dir = e.shiftKey ? -1 : 1;
+  const next = list[(idx + dir + list.length) % list.length];
+  next.focus();
+}
+
+/**
+ * 请求结束当日：
+ * - 行动点已用完：直接结算
+ * - 仍有剩余：先弹确认，说明将放弃几点，确认后才结算
+ * 结算后进入新一天之前，抽一件夜间随机事件。
+ */
+function requestEndDay() {
+  if (state.ap > 0) {
+    showConfirm(state.ap);
+  } else {
+    finishDay();
+  }
+}
+
+function showConfirm(remaining) {
+  if (confirmOpen) return;
+  confirmOpen = true;
+  remainApEl.textContent = remaining;
+  remainDayEl.textContent = state.day;
+  overlayEl.classList.add("show");
+  // 背景整体移出 Tab 序列、屏蔽点击与辅助技术交互
+  gameEl.inert = true;
+  lastFocused = document.activeElement;
+  cancelBtn.focus();
+}
+
+function hideConfirm() {
+  if (!confirmOpen) return;
+  confirmOpen = false;
+  overlayEl.classList.remove("show");
+  gameEl.inert = false;
+  if (lastFocused && typeof lastFocused.focus === "function") {
+    lastFocused.focus();
+  }
+}
+
+// ===== 制作台 =====
+function showCraft() {
+  if (craftOpen) return;
+  craftOpen = true;
+  refreshRecipes();
+  craftOverlayEl.classList.add("show");
+  gameEl.inert = true;
+  lastFocused = document.activeElement;
+  const first = craftRecipeBtns.find((b) => !b.disabled);
+  (first || closeCraftBtn).focus();
+}
+
+function hideCraft() {
+  if (!craftOpen) return;
+  craftOpen = false;
+  craftOverlayEl.classList.remove("show");
+  gameEl.inert = false;
+  render();
+  if (lastFocused && typeof lastFocused.focus === "function") {
+    lastFocused.focus();
+  }
+}
+
+// 按当前背包材料刷新配方按钮：不足的配方置灰
+function refreshRecipes() {
+  craftRecipeBtns.forEach((btn) => {
+    const recipe = RECIPES.find((r) => r.btnId === btn.id);
+    btn.disabled = !canAfford(recipe.cost);
+  });
+}
+
+// 配方按钮：材料够就做一件（不额外花行动点，打开制作台时已扣 1 点）
+RECIPES.forEach((recipe) => {
+  const btn = $(recipe.btnId);
+  btn.addEventListener("click", () => {
+    if (!craftOpen || !canAfford(recipe.cost)) return;
+    POOL_KEYS.forEach((k) => {
+      if (recipe.cost[k]) setPoolAmount(k, poolAmount(k) - recipe.cost[k]);
+    });
+    setPoolAmount("item." + recipe.id, poolAmount("item." + recipe.id) + 1);
+    addLog(`　└ 制作了 ${RESOURCE_META["item." + recipe.id].icon}${recipe.name} ×1`);
+    render();
+    refreshRecipes();
+    // 做完后若当前配方仍可继续做，焦点留在它上面；否则移到下一个可做配方
+    if (btn.disabled) {
+      const next = craftRecipeBtns.find((b) => !b.disabled);
+      if (next) next.focus();
+    }
+  });
+});
+
+// ===== 流浪商人 =====
+// 每次到访按当天日期重新生成行情：同一晚价格固定，不同晚在区间内浮动
+function showMerchant(day) {
+  merchantOpen = true;
+  merchantDay = day;
+  merchantStock = MERCHANT_OFFERS.map((offer, i) => ({
+    offer,
+    cost: Object.fromEntries(
+      Object.entries(offer.range).map(([k, [lo, hi]], j) =>
+        [k, lo + Math.floor(hashRand(day, i, j) * (hi - lo + 1))])
+    ),
+    soldOut: false,
+  }));
+  addLog(`第 ${day} 天深夜：流浪商人到访，可用多余材料换购物资`);
+  refreshMerchant();
+  merchantOverlayEl.classList.add("show");
+  gameEl.inert = true;
+  lastFocused = document.activeElement;
+  const first = merchantBuyBtns.find((b) => !b.disabled);
+  (first || closeMerchantBtn).focus();
+}
+
+function hideMerchant() {
+  if (!merchantOpen) return;
+  merchantOpen = false;
+  merchantOverlayEl.classList.remove("show");
+  gameEl.inert = false;
+  render();
+  if (lastFocused && typeof lastFocused.focus === "function") {
+    lastFocused.focus();
+  }
+}
+
+// 按当前背包刷新货物：材料不足的置灰并标红所缺材料，稀有物资售罄后显示「已成交」
+function refreshMerchant() {
+  merchantStock.forEach((entry) => {
+    const btn = $(entry.offer.btnId);
+    const costEl = $(entry.offer.costId);
+    if (entry.soldOut) {
+      btn.disabled = true;
+      costEl.innerHTML = `<span class="done">已成交</span>`;
+      return;
+    }
+    btn.disabled = !canAfford(entry.cost);
+    costEl.innerHTML = Object.entries(entry.cost)
+      .map(([k, v]) => {
+        const meta = RESOURCE_META[k];
+        const lack = poolAmount(k) < v ? ` class="lack"` : "";
+        return `<span${lack}>${meta.icon}×${v}</span>`;
+      })
+      .join(" ");
+  });
+}
+
+// 换购：扣材料、给货品（稀有物资的效果立即生效），成交结果写进当天日志
+MERCHANT_OFFERS.forEach((offer) => {
+  $(offer.btnId).addEventListener("click", () => {
+    if (!merchantOpen) return;
+    const entry = merchantStock.find((e) => e.offer === offer);
+    if (!entry || entry.soldOut || !canAfford(entry.cost)) return;
+    POOL_KEYS.forEach((k) => {
+      if (entry.cost[k]) setPoolAmount(k, poolAmount(k) - entry.cost[k]);
+    });
+    applyEffects(offer.gives);
+    if (offer.rare) entry.soldOut = true;
+    const paid = Object.entries(entry.cost)
+      .map(([k, v]) => `${RESOURCE_META[k].icon}${RESOURCE_META[k].name}×${v}`)
+      .join("、");
+    const statPart = ["sta", "dan"]
+      .filter((k) => offer.gives[k])
+      .map((k) => `${STAT_LABEL[k]} ${offer.gives[k] > 0 ? "+" : ""}${offer.gives[k]}`)
+      .join("，");
+    addLog(
+      `第 ${merchantDay} 天深夜：与商人成交，付出 ${paid}，` +
+      `换得 ${offer.icon}${offer.name}×1${statPart ? `（${statPart}）` : ""}`
+    );
+    render();
+    refreshMerchant();
+    // 材料花光后当前货物可能买不起了，焦点移到下一个可成交货物
+    if ($(offer.btnId).disabled) {
+      const next = merchantBuyBtns.find((b) => !b.disabled);
+      if (next) next.focus();
+    }
+  });
+});
+
+function finishDay() {
+  if (state.ap > 0) {
+    addLog(`第 ${state.day} 天结束：放弃了 ${state.ap} 点未使用的行动点`);
+  } else {
+    addLog(`第 ${state.day} 天结束：行动点已全部用完`);
+  }
+  const endedDay = state.day;
+  state.day += 1;
+  state.ap = state.apMax; // 新的一天恢复点数，不累计昨日剩余
+  render();
+  showEvent(drawEvent(), endedDay);
+}
+
+// ===== 随机事件 =====
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+function drawEvent() {
+  return EVENTS[Math.floor(Math.random() * EVENTS.length)];
+}
+
+// eff 字段 → 中文名称
+const STAT_LABEL = { sta: "体力", dan: "危险" };
+function effEntries(eff) {
+  // 资源按背包顺序展示，体力、危险排在最后，日志读起来更顺
+  return POOL_KEYS
+    .filter((k) => eff[k])
+    .map((k) => [k, eff[k]])
+    .concat(["sta", "dan"].filter((k) => eff[k]).map((k) => [k, eff[k]]));
+}
+const effName = (key) =>
+  RESOURCE_META[key] ? `${RESOURCE_META[key].icon}${RESOURCE_META[key].name}` : STAT_LABEL[key];
+function effectDeltas(eff) {
+  return effEntries(eff).filter(([, d]) => d !== 0);
+}
+function effectText(eff) {
+  const deltas = effectDeltas(eff);
+  if (!deltas.length) return "无变化";
+  return deltas
+    .map(([k, d]) => `${effName(k)} ${d > 0 ? "+" : ""}${d}`)
+    .join("，");
+}
+function effectHintHTML(eff) {
+  const deltas = effectDeltas(eff);
+  if (!deltas.length) return `<span class="zero">无变化</span>`;
+  return deltas
+    .map(([k, d]) => {
+      const sign = d > 0 ? "+" : "";
+      return `<span class="${d > 0 ? "up" : "down"}">${effName(k)} ${sign}${d}</span>`;
+    })
+    .join("");
+}
+// 选项里的负向消耗（材料/道具）是否都够用
+function choiceAvailable(eff) {
+  return POOL_KEYS.every((k) => !eff[k] || poolAmount(k) + eff[k] >= 0);
+}
+// 不足时提示还差什么，例如「需要 🔥火把 ×1」
+function needText(eff) {
+  const needs = POOL_KEYS
+    .filter((k) => eff[k] < 0 && poolAmount(k) + eff[k] < 0)
+    .map((k) => `${effName(k)}×${-eff[k]}`);
+  return needs.length ? `需要 ${needs.join("、")}` : "";
+}
+
+function applyEffects(eff) {
+  POOL_KEYS.forEach((k) => {
+    if (eff[k]) setPoolAmount(k, clamp(poolAmount(k) + eff[k], 0, STAT_CAP.pool));
+  });
+  state.stamina = clamp(state.stamina + (eff.sta || 0), 0, STAT_CAP.sta);
+  state.danger = clamp(state.danger + (eff.dan || 0), 0, STAT_CAP.dan);
+}
+
+function showEvent(ev, endedDay) {
+  eventOpen = true;
+  currentEvent = { ev, endedDay };
+  eventTitleEl.textContent = `${ev.icon} ${ev.title}`;
+  eventDescEl.textContent = ev.desc;
+  ev.choices.forEach((choice, i) => {
+    const btn = choiceEls[i];
+    const available = choiceAvailable(choice.eff);
+    btn.hidden = false;
+    btn.disabled = !available;
+    const hint = available
+      ? effectHintHTML(choice.eff)
+      : `<span class="down">${needText(choice.eff)}</span>`;
+    btn.innerHTML =
+      `<span class="choice-text">${choice.text}</span>` +
+      `<span class="hint">${hint}</span>`;
+  });
+  // 选项不足 4 个时，藏起多余按钮
+  for (let i = ev.choices.length; i < choiceEls.length; i++) {
+    choiceEls[i].hidden = true;
+    choiceEls[i].disabled = false;
+  }
+  eventOverlayEl.classList.add("show");
+  gameEl.inert = true;
+  lastFocused = document.activeElement;
+  (choiceEls.find((b) => !b.hidden && !b.disabled) || choiceEls[0]).focus();
+}
+
+function hideEvent() {
+  eventOpen = false;
+  eventOverlayEl.classList.remove("show");
+  gameEl.inert = false;
+  currentEvent = null;
+  if (lastFocused && typeof lastFocused.focus === "function") {
+    lastFocused.focus();
+  }
+}
+
+choiceEls.forEach((btn, i) => {
+  btn.addEventListener("click", () => {
+    if (!eventOpen || !currentEvent || btn.disabled) return;
+    const choice = currentEvent.ev.choices[i];
+    if (!choice) return;
+    const endedDay = currentEvent.endedDay;
+    applyEffects(choice.eff); // 选项直接改物资、体力、危险值
+    addLog(
+      `第 ${endedDay} 天深夜：遭遇「${currentEvent.ev.title}」，` +
+      `选择「${choice.text}」（${effectText(choice.eff)}）`
+    );
+    hideEvent();
+    render();
+    // 结算后判定生存结局：体力归零或危险顶格，本局到此为止
+    const ending = checkGameOver();
+    if (ending) {
+      endRun(ending, endedDay);
+    } else if (endedDay % MERCHANT_INTERVAL === 0) {
+      showMerchant(endedDay); // 每隔几天，深夜事件后流浪商人到访
+    }
+  });
+});
+
+// ===== 生存结局 =====
+function checkGameOver() {
+  if (state.stamina <= 0) return "exhausted";
+  if (state.danger >= STAT_CAP.dan) return "overrun";
+  return null;
+}
+
+// 本局结束：展示生存天数与评语，并把最好成绩写进本地纪录
+function endRun(endingId, days) {
+  gameOver = true;
+  overOpen = true;
+  render(); // 刷新一次界面：禁用行动与结束当日按钮
+  const ending = ENDINGS[endingId];
+  const prev = loadBest();
+  const isRecord = !prev || days > prev.days;
+  if (isRecord) {
+    saveBest({ days, ending: endingId, date: new Date().toISOString().slice(0, 10) });
+  }
+  overTitleEl.textContent = `${ending.icon} ${ending.title}`;
+  overDescEl.textContent = ending.desc;
+  overDaysEl.textContent = days;
+  overEvalEl.textContent = evaluation(days);
+  newRecordEl.hidden = !isRecord;
+  overBestEl.textContent = `历史最佳：${isRecord ? days : prev.days} 天`;
+  addLog(`第 ${days} 天深夜：${ending.title}，本局结束（共生存 ${days} 天）`);
+  overOverlayEl.classList.add("show");
+  gameEl.inert = true;
+  lastFocused = document.activeElement;
+  restartBtn.focus();
+}
+
+// 再来一局：全部状态归零，日志清空
+restartBtn.addEventListener("click", () => {
+  if (!overOpen) return;
+  state.day = 1;
+  state.apMax = AP_PER_NIGHT;
+  state.ap = AP_PER_NIGHT;
+  state.mats = { ...INIT_MATS };
+  state.items = { torch: 0, ration: 0, trap: 0 };
+  state.stamina = 6;
+  state.danger = 0;
+  gameOver = false;
+  overOpen = false;
+  merchantOpen = false;
+  merchantStock = [];
+  overOverlayEl.classList.remove("show");
+  merchantOverlayEl.classList.remove("show");
+  gameEl.inert = false;
+  logEl.innerHTML = "";
+  addLog("新的一局开始：营地重新燃起篝火。");
+  render();
+  endDayBtn.focus();
+});
+
+// ===== 最佳纪录弹窗 =====
+recordBtn.addEventListener("click", () => {
+  if (gameOver || confirmOpen || eventOpen || craftOpen || merchantOpen || recordOpen) return;
+  showRecord();
+});
+closeRecordBtn.addEventListener("click", hideRecord);
+
+function showRecord() {
+  if (recordOpen) return;
+  recordOpen = true;
+  const best = loadBest();
+  if (best) {
+    const endName = ENDINGS[best.ending] ? ENDINGS[best.ending].title : "未知结局";
+    recordDaysEl.textContent = best.days;
+    recordMetaEl.textContent = `结局：${endName} · ${best.date || "日期不详"}`;
+  } else {
+    recordDaysEl.textContent = "–";
+    recordMetaEl.textContent = "还没有任何纪录，先努力活过几个夜晚吧。";
+  }
+  recordOverlayEl.classList.add("show");
+  gameEl.inert = true;
+  lastFocused = document.activeElement;
+  closeRecordBtn.focus();
+}
+
+function hideRecord() {
+  if (!recordOpen) return;
+  recordOpen = false;
+  recordOverlayEl.classList.remove("show");
+  gameEl.inert = false;
+  if (lastFocused && typeof lastFocused.focus === "function") {
+    lastFocused.focus();
+  }
+}
+
+render();
+</script>
+</body>
+</html>
